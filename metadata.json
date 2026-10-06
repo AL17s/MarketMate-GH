@@ -1,0 +1,6 @@
+{
+  "name": "MarketMate GH",
+  "description": "Ghana-focused SME management platform for sales, POS, expenses, inventory, debtors credit book, and Gemini-powered business analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
