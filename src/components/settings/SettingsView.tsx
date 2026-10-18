@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Business } from '../../types/models';
+import { GEMINI_API_KEY_STORAGE } from '../../services/aiService';
 
 interface SettingsViewProps {
   business: Business;
@@ -33,6 +34,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [telecelNumber, setTelecelNumber] = useState(business.momoSettings.telecelNumber || '0205882190');
   const [atMoneyNumber, setAtMoneyNumber] = useState(business.momoSettings.atMoneyNumber || '0261993420');
 
+  // AI Advisor Configuration (Gemini API Key)
+  const [geminiApiKey, setGeminiApiKey] = useState(() => {
+    return typeof window !== 'undefined'
+      ? localStorage.getItem(GEMINI_API_KEY_STORAGE) || ''
+      : '';
+  });
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -48,6 +57,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Persist Gemini API Key in localStorage
+    if (geminiApiKey.trim()) {
+      localStorage.setItem(GEMINI_API_KEY_STORAGE, geminiApiKey.trim());
+    } else {
+      localStorage.removeItem(GEMINI_API_KEY_STORAGE);
+    }
+
     await onUpdateBusiness({
       name,
       branch,
@@ -68,7 +85,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
-    showToast('Store settings saved successfully!');
+    showToast('Store & AI Advisor settings saved successfully!');
   };
 
   const handleConfirmResetStore = () => {
@@ -305,6 +322,74 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 }`}
               />
             </button>
+          </div>
+        </div>
+
+        {/* AI ADVISOR CONFIGURATION */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs space-y-4 text-xs">
+          <div className="pb-2 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#005431] text-[18px]">psychology</span>
+              <span>AI Advisor Configuration</span>
+            </h2>
+            <span className="text-[10px] font-mono-num font-bold text-[#005431] bg-emerald-50 px-2 py-0.5 rounded">
+              AI STUDIO STARTER TIER
+            </span>
+          </div>
+
+          <p className="text-gray-500 leading-relaxed">
+            Provide your Gemini API key to enable direct client-side intelligent reasoning using <strong className="text-gray-700">gemini-2.5-flash</strong> for Mate AI business queries. If no key is configured or you are offline, Mate AI automatically falls back to the deterministic local financial calculations engine.
+          </p>
+
+          <div>
+            <label className="block font-mono-num text-gray-500 uppercase font-bold mb-1">
+              Gemini API Key
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type={showGeminiKey ? 'text' : 'password'}
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full pl-3 pr-24 py-2 rounded-lg bg-[#f0f3ff] text-gray-900 font-mono-num text-xs border border-blue-50 focus:outline-none focus:ring-2 focus:ring-[#005431]"
+              />
+              <div className="absolute right-1.5 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  className="px-2 py-1 text-[11px] text-gray-500 hover:text-gray-800 rounded font-semibold cursor-pointer"
+                >
+                  {showGeminiKey ? 'Hide' : 'Show'}
+                </button>
+                {geminiApiKey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGeminiApiKey('');
+                      localStorage.removeItem(GEMINI_API_KEY_STORAGE);
+                      showToast('Gemini API key removed.');
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-600 rounded cursor-pointer"
+                    title="Clear Key"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-[11px] text-gray-400">
+              <span>
+                Stored securely in browser local storage (<code className="text-[#005431] font-mono-num font-semibold">{GEMINI_API_KEY_STORAGE}</code>)
+              </span>
+              {geminiApiKey.trim() ? (
+                <span className="text-[#005431] font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                  Client Key Configured
+                </span>
+              ) : (
+                <span className="text-amber-700 font-semibold">Local calculation fallback active</span>
+              )}
+            </div>
           </div>
         </div>
 

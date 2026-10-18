@@ -1,4 +1,7 @@
+import { GoogleGenAI } from '@google/genai';
 import { BusinessMetrics } from '../types/models';
+
+export const GEMINI_API_KEY_STORAGE = 'marketmate_gemini_api_key';
 
 export interface AssistantResponse {
   answer: string;
@@ -15,7 +18,9 @@ export interface AssistantResponse {
 }
 
 /**
- * Client service to query Mate AI Business Assistant
+ * Client service to query Mate AI Business Assistant.
+ * Uses client-side Gemini AI via @google/genai if a key is stored in localStorage.
+ * Falls back to server proxy and deterministic local calculation engine.
  */
 export async function askMateAi(
   query: string,
@@ -30,6 +35,87 @@ export async function askMateAi(
     lowStockList: { name: string; current: number; threshold: number }[];
   }
 ): Promise<AssistantResponse> {
+  // 1. Direct Client-Side Gemini AI (AI Studio Starter Tier)
+  try {
+    const savedKey =
+      typeof window !== 'undefined'
+        ? localStorage.getItem(GEMINI_API_KEY_STORAGE)?.trim()
+        : null;
+
+    if (savedKey && navigator.onLine) {
+      const ai = new GoogleGenAI({ apiKey: savedKey });
+      const prompt = `You are "Mate AI", an expert Ghanaian SME business advisor and financial intelligence partner for "${storeContext.storeName}" (${storeContext.branch}).
+All monetary amounts are in Ghanaian Cedis (GH₵).
+
+Current Real Business Metrics:
+- Today's Gross Sales: GH₵ ${metrics.dailySales.toFixed(2)} (${metrics.dailySalesCount} transactions)
+- Today's Gross Profit: GH₵ ${metrics.dailyGrossProfit.toFixed(2)}
+- Today's Outflows/Expenses: GH₵ ${metrics.dailyExpenses.toFixed(2)}
+- Today's Estimated Net Profit: GH₵ ${metrics.dailyNetProfit.toFixed(2)}
+- Weekly Sales (last 7 days): GH₵ ${metrics.weeklySales.toFixed(2)}
+- Weekly Expenses: GH₵ ${metrics.weeklyExpenses.toFixed(2)}
+- Weekly Net Profit: GH₵ ${metrics.weeklyNetProfit.toFixed(2)}
+- Monthly Sales: GH₵ ${metrics.monthlySales.toFixed(2)}
+- Monthly Expenses: GH₵ ${metrics.monthlyExpenses.toFixed(2)}
+- Monthly Gross Profit: GH₵ ${metrics.monthlyGrossProfit.toFixed(2)}
+- Monthly Estimated Net Profit: GH₵ ${metrics.monthlyNetProfit.toFixed(2)}
+- Last Month's Sales: GH₵ ${metrics.lastMonthSales.toFixed(2)}
+- Month-over-Month Growth: ${metrics.monthOverMonthGrowthPercent >= 0 ? '+' : ''}${metrics.monthOverMonthGrowthPercent.toFixed(1)}%
+- Total Stock Valuation (Selling Value): GH₵ ${metrics.inventoryValueSelling.toFixed(2)}
+- Total Stock Valuation (Cost Basis): GH₵ ${metrics.inventoryValueCost.toFixed(2)}
+- Total Active Catalog Items: ${metrics.totalCatalogCount}
+- Low Stock Items Count: ${metrics.lowStockItemsCount}
+- Completely Out of Stock Items: ${metrics.outOfStockCount}
+- Outstanding Customer Debts: GH₵ ${metrics.outstandingCustomerCredit.toFixed(2)} (${metrics.totalDebtorsCount} debtors)
+- Overdue Debt Accounts: ${metrics.overdueCreditCount}
+
+Debtors Details:
+${storeContext.debtorsList.map((d) => `- ${d.name}: GH₵ ${d.amount.toFixed(2)} (due ${d.due.slice(0, 10)})`).join('\n') || 'None'}
+
+Top Selling Products Today:
+${storeContext.topSellers.map((t, idx) => `${idx + 1}. ${t.name}: ${t.sold} units sold (GH₵ ${t.revenue.toFixed(2)})`).join('\n') || 'No sales recorded yet today'}
+
+Low Stock Items:
+${storeContext.lowStockList.map((l) => `- ${l.name}: ${l.current} left (Threshold: ${l.threshold})`).join('\n') || 'All items healthy'}
+
+Merchant Question: "${query}"
+
+Instructions:
+1. Provide a warm, practical Ghanaian SME business answer. Use Markdown formatting (bolding key numbers).
+2. Answer accurately using ONLY the stored numbers above. NEVER invent or hallucinate financial numbers.
+3. Return ONLY a valid JSON object matching this schema:
+{
+  "answer": "string with markdown",
+  "keyMetrics": [
+    { "label": "string", "value": "string", "trend": "optional string" }
+  ],
+  "suggestedActions": [
+    { "label": "string", "actionType": "navigate" | "restock" | "whatsapp" | "report", "payload": "string" }
+  ]
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      });
+
+      const responseText = response.text?.trim();
+      if (responseText) {
+        const parsed = JSON.parse(responseText) as AssistantResponse;
+        if (parsed.answer) {
+          return parsed;
+        }
+      }
+    }
+  } catch (clientAiErr) {
+    console.warn('Client-side Gemini AI query encountered error, falling back to local engine:', clientAiErr);
+  }
+
+  // 2. Fallback to server-side endpoint if available
   try {
     const res = await fetch('/api/assistant', {
       method: 'POST',
@@ -48,10 +134,10 @@ export async function askMateAi(
       return data;
     }
   } catch (err) {
-    console.warn('Network call to /api/assistant encountered error, using local financial engine:', err);
+    // Network offline or endpoint unavailable
   }
 
-  // Guaranteed fallback: Rule-based calculations directly from real stored data
+  // 3. Guaranteed Offline / Local Fallback: Rule-based calculations directly from real stored data
   return generateDeterministicAnswer(query, metrics, storeContext);
 }
 

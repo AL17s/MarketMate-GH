@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BusinessMetrics, Business, Product, CustomerCredit, Sale } from '../../types/models';
-import { askMateAi, AssistantResponse } from '../../services/aiService';
+import { askMateAi, AssistantResponse, GEMINI_API_KEY_STORAGE } from '../../services/aiService';
 
 interface MateAiAdvisorViewProps {
   metrics: BusinessMetrics;
@@ -127,14 +127,30 @@ export const MateAiAdvisorView: React.FC<MateAiAdvisorViewProps> = ({
             <span className="material-symbols-outlined text-[26px]">smart_toy</span>
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg md:text-xl font-bold">Ask Mate AI</h1>
-              <span className="px-2 py-0.5 rounded-full bg-[#feae2c] text-[#291800] text-[10px] font-mono-num font-bold">
-                PRO • Gemini 3.8 Flash
-              </span>
+              {typeof window !== 'undefined' && localStorage.getItem(GEMINI_API_KEY_STORAGE) ? (
+                <span className="px-2 py-0.5 rounded-full bg-[#feae2c] text-[#291800] text-[10px] font-mono-num font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#835500] animate-pulse"></span>
+                  Client • Gemini 2.5 Flash
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-800 text-emerald-100 text-[10px] font-mono-num font-bold">
+                  Deterministic Local Engine
+                </span>
+              )}
             </div>
             <p className="text-xs text-emerald-100">
               Zero financial hallucinations. Answers calculated strictly from {business.name} data.
+              {!Boolean(typeof window !== 'undefined' && localStorage.getItem(GEMINI_API_KEY_STORAGE)) && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('settings')}
+                  className="ml-2 underline text-amber-200 hover:text-white cursor-pointer"
+                >
+                  Configure Gemini Key →
+                </button>
+              )}
             </p>
           </div>
         </div>
