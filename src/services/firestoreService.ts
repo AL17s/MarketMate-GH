@@ -485,6 +485,138 @@ export class MarketMateDataStore {
     this.notify();
     return this.business;
   }
+
+  // --- DATA MANAGEMENT (FRESH START & RESTORE) ---
+  clearSampleData(): void {
+    this.sales = [];
+    this.saleItems = [];
+    this.expenses = [];
+    this.products = [];
+    this.transactions = [];
+    this.customerCredit = [];
+    this.creditPayments = [];
+    this.notifications = [
+      {
+        id: `notif_${Date.now()}`,
+        businessId: this.business.id,
+        title: '✨ Fresh Store Ledger Ready',
+        body: 'Sample data cleared. You can now add your real products, record sales, and log expenses.',
+        type: 'daily_summary',
+        read: false,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    setLocalData(STORAGE_KEYS.SALES, this.sales);
+    setLocalData(STORAGE_KEYS.SALE_ITEMS, this.saleItems);
+    setLocalData(STORAGE_KEYS.EXPENSES, this.expenses);
+    setLocalData(STORAGE_KEYS.PRODUCTS, this.products);
+    setLocalData(STORAGE_KEYS.TRANSACTIONS, this.transactions);
+    setLocalData(STORAGE_KEYS.CREDIT, this.customerCredit);
+    setLocalData(STORAGE_KEYS.CREDIT_PAYMENTS, this.creditPayments);
+    setLocalData(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+
+    this.notify();
+  }
+
+  reloadSampleData(): void {
+    this.products = [...INITIAL_PRODUCTS];
+    this.sales = [...INITIAL_SALES];
+    this.saleItems = [...INITIAL_SALE_ITEMS];
+    this.expenses = [...INITIAL_EXPENSES];
+    this.customers = [...INITIAL_CUSTOMERS];
+    this.customerCredit = [...INITIAL_CUSTOMER_CREDIT];
+    this.creditPayments = [...INITIAL_CREDIT_PAYMENTS];
+    this.suppliers = [...INITIAL_SUPPLIERS];
+    this.transactions = [...INITIAL_TRANSACTIONS];
+    this.notifications = [...INITIAL_NOTIFICATIONS];
+    this.subscription = { ...INITIAL_SUBSCRIPTION };
+
+    setLocalData(STORAGE_KEYS.PRODUCTS, this.products);
+    setLocalData(STORAGE_KEYS.SALES, this.sales);
+    setLocalData(STORAGE_KEYS.SALE_ITEMS, this.saleItems);
+    setLocalData(STORAGE_KEYS.EXPENSES, this.expenses);
+    setLocalData(STORAGE_KEYS.CUSTOMERS, this.customers);
+    setLocalData(STORAGE_KEYS.CREDIT, this.customerCredit);
+    setLocalData(STORAGE_KEYS.CREDIT_PAYMENTS, this.creditPayments);
+    setLocalData(STORAGE_KEYS.SUPPLIERS, this.suppliers);
+    setLocalData(STORAGE_KEYS.TRANSACTIONS, this.transactions);
+    setLocalData(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+    setLocalData(STORAGE_KEYS.SUBSCRIPTION, this.subscription);
+
+    this.notify();
+  }
+
+  // --- BATCH PRODUCT IMPORT ---
+  importProducts(
+    newItems: Array<{
+      name: string;
+      sku?: string;
+      barcode?: string;
+      category?: Product['category'];
+      costPrice: number;
+      sellingPrice: number;
+      stockQuantity: number;
+      lowStockThreshold?: number;
+      unit?: string;
+    }>
+  ): number {
+    const existing = [...this.products];
+    let addedCount = 0;
+
+    newItems.forEach((item, index) => {
+      if (!item.name || !item.sellingPrice) return;
+
+      const generatedSku = item.sku || `SKU-${Date.now().toString().slice(-4)}-${index}`;
+      const existingIdx = existing.findIndex(
+        (p) =>
+          p.sku.toLowerCase() === generatedSku.toLowerCase() ||
+          p.name.toLowerCase() === item.name.toLowerCase()
+      );
+
+      const category = item.category || 'Provisions';
+      const unit = item.unit || 'piece';
+      const lowThreshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 10;
+
+      if (existingIdx >= 0) {
+        // Update existing product stock & prices
+        existing[existingIdx] = {
+          ...existing[existingIdx],
+          sellingPrice: item.sellingPrice,
+          costPrice: item.costPrice || existing[existingIdx].costPrice,
+          stockQuantity: item.stockQuantity,
+          lowStockThreshold: lowThreshold,
+          category,
+          unit,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        // Add new
+        existing.push({
+          id: `prod_${Date.now()}_${index}`,
+          businessId: this.business.id,
+          name: item.name,
+          sku: generatedSku,
+          barcode: item.barcode,
+          category,
+          costPrice: item.costPrice || item.sellingPrice * 0.75,
+          sellingPrice: item.sellingPrice,
+          stockQuantity: item.stockQuantity || 0,
+          lowStockThreshold: lowThreshold,
+          unit,
+          lastRestockDate: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        addedCount++;
+      }
+    });
+
+    this.products = existing;
+    setLocalData(STORAGE_KEYS.PRODUCTS, this.products);
+    this.notify();
+    return addedCount;
+  }
 }
 
 export const store = new MarketMateDataStore();
