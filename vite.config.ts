@@ -78,6 +78,7 @@ IMPORTANT: Return ONLY raw JSON without markdown code fences.`;
 
 export default defineConfig(() => {
   return {
+    base: './',
     plugins: [react(), tailwindcss(), geminiAssistantPlugin()],
     resolve: {
       alias: {
