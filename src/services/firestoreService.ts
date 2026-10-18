@@ -44,7 +44,7 @@ import {
 } from './seedData';
 
 // Local storage keys for instant zero-latency offline resilience
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   USER: 'marketmate_user',
   BUSINESS: 'marketmate_business',
   PRODUCTS: 'marketmate_products',
@@ -58,13 +58,15 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'marketmate_transactions',
   NOTIFICATIONS: 'marketmate_notifications',
   SUBSCRIPTION: 'marketmate_subscription',
+  ONBOARDING_COMPLETED: 'marketmate_onboarding_completed',
+  IS_DEMO_MODE: 'marketmate_is_demo_mode',
 };
 
 function getLocalData<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) {
-      localStorage.setItem(key, JSON.stringify(fallback));
+      // NOTE: Do NOT write fallback to localStorage on initial read!
       return fallback;
     }
     return JSON.parse(raw) as T;
@@ -82,22 +84,33 @@ function setLocalData<T>(key: string, data: T): void {
 }
 
 export class MarketMateDataStore {
-  // In-memory state cached from local storage and synced with Firestore
+  // In-memory state: fallbacks are empty arrays so first-time users start clean without demo clutter
   user: User = getLocalData(STORAGE_KEYS.USER, INITIAL_USER);
   business: Business = getLocalData(STORAGE_KEYS.BUSINESS, INITIAL_BUSINESS);
-  products: Product[] = getLocalData(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
-  sales: Sale[] = getLocalData(STORAGE_KEYS.SALES, INITIAL_SALES);
-  saleItems: SaleItem[] = getLocalData(STORAGE_KEYS.SALE_ITEMS, INITIAL_SALE_ITEMS);
-  expenses: Expense[] = getLocalData(STORAGE_KEYS.EXPENSES, INITIAL_EXPENSES);
-  customers: Customer[] = getLocalData(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS);
-  customerCredit: CustomerCredit[] = getLocalData(STORAGE_KEYS.CREDIT, INITIAL_CUSTOMER_CREDIT);
-  creditPayments: CreditPayment[] = getLocalData(STORAGE_KEYS.CREDIT_PAYMENTS, INITIAL_CREDIT_PAYMENTS);
-  suppliers: Supplier[] = getLocalData(STORAGE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
-  transactions: InventoryTransaction[] = getLocalData(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-  notifications: Notification[] = getLocalData(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+  products: Product[] = getLocalData<Product[]>(STORAGE_KEYS.PRODUCTS, []);
+  sales: Sale[] = getLocalData<Sale[]>(STORAGE_KEYS.SALES, []);
+  saleItems: SaleItem[] = getLocalData<SaleItem[]>(STORAGE_KEYS.SALE_ITEMS, []);
+  expenses: Expense[] = getLocalData<Expense[]>(STORAGE_KEYS.EXPENSES, []);
+  customers: Customer[] = getLocalData<Customer[]>(STORAGE_KEYS.CUSTOMERS, []);
+  customerCredit: CustomerCredit[] = getLocalData<CustomerCredit[]>(STORAGE_KEYS.CREDIT, []);
+  creditPayments: CreditPayment[] = getLocalData<CreditPayment[]>(STORAGE_KEYS.CREDIT_PAYMENTS, []);
+  suppliers: Supplier[] = getLocalData<Supplier[]>(STORAGE_KEYS.SUPPLIERS, []);
+  transactions: InventoryTransaction[] = getLocalData<InventoryTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
+  notifications: Notification[] = getLocalData<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
   subscription: Subscription = getLocalData(STORAGE_KEYS.SUBSCRIPTION, INITIAL_SUBSCRIPTION);
 
   private listeners: (() => void)[] = [];
+
+  hasConfiguredBusiness(): boolean {
+    try {
+      const onboarded = localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
+      if (onboarded === 'true') return true;
+      if (onboarded === 'false') return false;
+      return localStorage.getItem(STORAGE_KEYS.BUSINESS) !== null;
+    } catch {
+      return false;
+    }
+  }
 
   subscribe(callback: () => void): () => void {
     this.listeners.push(callback);
@@ -487,6 +500,187 @@ export class MarketMateDataStore {
   }
 
   // --- DATA MANAGEMENT (FRESH START & RESTORE) ---
+  async initializeCleanStore(config: {
+    ownerName: string;
+    shopName: string;
+    branch: string;
+    location: string;
+    phone: string;
+    momoProvider?: 'mtn' | 'telecel' | 'at';
+    momoNumber?: string;
+    momoMerchantName?: string;
+    cashDrawerFloatGHS?: number;
+    graVatFlatRateEnabled?: boolean;
+  }): Promise<Business> {
+    const businessId = `biz_${Date.now()}`;
+    const userId = `usr_${Date.now()}`;
+
+    const momoSettings = {
+      mtnNumber: config.momoProvider === 'mtn' ? config.momoNumber || config.phone : '',
+      mtnMerchantName: config.momoProvider === 'mtn' ? config.momoMerchantName || config.shopName : '',
+      telecelNumber: config.momoProvider === 'telecel' ? config.momoNumber || config.phone : '',
+      atMoneyNumber: config.momoProvider === 'at' ? config.momoNumber || config.phone : '',
+    };
+
+    const now = new Date().toISOString();
+
+    const newBusiness: Business = {
+      id: businessId,
+      name: config.shopName.trim() || 'My Ghana Shop',
+      branch: config.branch.trim() || 'Main Stall',
+      location: config.location.trim() || 'Makola Market, Accra',
+      ownerId: userId,
+      phone: config.phone.trim(),
+      currency: 'GHS',
+      country: 'Ghana',
+      cashDrawerFloatGHS: config.cashDrawerFloatGHS ?? 500,
+      monthlyExpenseCap: 5000,
+      graVatFlatRateEnabled: !!config.graVatFlatRateEnabled,
+      vatRatePercent: config.graVatFlatRateEnabled ? 3 : 0,
+      momoSettings,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const newUser: User = {
+      id: userId,
+      email: 'owner@marketmate.gh',
+      displayName: config.ownerName.trim() || 'Shop Owner',
+      phone: config.phone.trim(),
+      role: 'owner',
+      businessId,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const welcomeNotif: Notification = {
+      id: `notif_${Date.now()}`,
+      businessId,
+      title: '🇬🇭 Akwaaba to MarketMate GH!',
+      body: `Welcome, ${newUser.displayName}! Your shop "${newBusiness.name}" is now ready. Start by adding your first product in Inventory or recording a quick sale.`,
+      type: 'daily_summary',
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.business = newBusiness;
+    this.user = newUser;
+    this.products = [];
+    this.sales = [];
+    this.saleItems = [];
+    this.expenses = [];
+    this.customers = [];
+    this.customerCredit = [];
+    this.creditPayments = [];
+    this.suppliers = [];
+    this.transactions = [];
+    this.notifications = [welcomeNotif];
+
+    setLocalData(STORAGE_KEYS.BUSINESS, this.business);
+    setLocalData(STORAGE_KEYS.USER, this.user);
+    setLocalData(STORAGE_KEYS.PRODUCTS, this.products);
+    setLocalData(STORAGE_KEYS.SALES, this.sales);
+    setLocalData(STORAGE_KEYS.SALE_ITEMS, this.saleItems);
+    setLocalData(STORAGE_KEYS.EXPENSES, this.expenses);
+    setLocalData(STORAGE_KEYS.CUSTOMERS, this.customers);
+    setLocalData(STORAGE_KEYS.CREDIT, this.customerCredit);
+    setLocalData(STORAGE_KEYS.CREDIT_PAYMENTS, this.creditPayments);
+    setLocalData(STORAGE_KEYS.SUPPLIERS, this.suppliers);
+    setLocalData(STORAGE_KEYS.TRANSACTIONS, this.transactions);
+    setLocalData(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+      localStorage.setItem(STORAGE_KEYS.IS_DEMO_MODE, 'false');
+    } catch (err) {
+      console.warn('LocalStorage flags update failed:', err);
+    }
+
+    try {
+      await setDoc(doc(db, 'businesses', businessId), newBusiness);
+      await setDoc(doc(db, 'users', userId), newUser);
+    } catch {
+      // Offline mode
+    }
+
+    this.notify();
+    return newBusiness;
+  }
+
+  loadDemoStore(): void {
+    this.products = [...INITIAL_PRODUCTS];
+    this.sales = [...INITIAL_SALES];
+    this.saleItems = [...INITIAL_SALE_ITEMS];
+    this.expenses = [...INITIAL_EXPENSES];
+    this.customers = [...INITIAL_CUSTOMERS];
+    this.customerCredit = [...INITIAL_CUSTOMER_CREDIT];
+    this.creditPayments = [...INITIAL_CREDIT_PAYMENTS];
+    this.suppliers = [...INITIAL_SUPPLIERS];
+    this.transactions = [...INITIAL_TRANSACTIONS];
+    this.notifications = [...INITIAL_NOTIFICATIONS];
+    this.business = { ...INITIAL_BUSINESS };
+    this.user = { ...INITIAL_USER };
+    this.subscription = { ...INITIAL_SUBSCRIPTION };
+
+    setLocalData(STORAGE_KEYS.PRODUCTS, this.products);
+    setLocalData(STORAGE_KEYS.SALES, this.sales);
+    setLocalData(STORAGE_KEYS.SALE_ITEMS, this.saleItems);
+    setLocalData(STORAGE_KEYS.EXPENSES, this.expenses);
+    setLocalData(STORAGE_KEYS.CUSTOMERS, this.customers);
+    setLocalData(STORAGE_KEYS.CREDIT, this.customerCredit);
+    setLocalData(STORAGE_KEYS.CREDIT_PAYMENTS, this.creditPayments);
+    setLocalData(STORAGE_KEYS.SUPPLIERS, this.suppliers);
+    setLocalData(STORAGE_KEYS.TRANSACTIONS, this.transactions);
+    setLocalData(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+    setLocalData(STORAGE_KEYS.BUSINESS, this.business);
+    setLocalData(STORAGE_KEYS.USER, this.user);
+    setLocalData(STORAGE_KEYS.SUBSCRIPTION, this.subscription);
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+      localStorage.setItem(STORAGE_KEYS.IS_DEMO_MODE, 'true');
+    } catch (err) {
+      console.warn('LocalStorage flags update failed:', err);
+    }
+
+    this.notify();
+  }
+
+  resetStoreAndStartClean(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
+      localStorage.removeItem(STORAGE_KEYS.BUSINESS);
+      localStorage.removeItem(STORAGE_KEYS.PRODUCTS);
+      localStorage.removeItem(STORAGE_KEYS.SALES);
+      localStorage.removeItem(STORAGE_KEYS.SALE_ITEMS);
+      localStorage.removeItem(STORAGE_KEYS.EXPENSES);
+      localStorage.removeItem(STORAGE_KEYS.CUSTOMERS);
+      localStorage.removeItem(STORAGE_KEYS.CREDIT);
+      localStorage.removeItem(STORAGE_KEYS.CREDIT_PAYMENTS);
+      localStorage.removeItem(STORAGE_KEYS.SUPPLIERS);
+      localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+      localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
+      localStorage.removeItem(STORAGE_KEYS.IS_DEMO_MODE);
+    } catch (err) {
+      console.warn('Error clearing localStorage for reset:', err);
+    }
+
+    this.business = { ...INITIAL_BUSINESS };
+    this.user = { ...INITIAL_USER };
+    this.products = [];
+    this.sales = [];
+    this.saleItems = [];
+    this.expenses = [];
+    this.customers = [];
+    this.customerCredit = [];
+    this.creditPayments = [];
+    this.suppliers = [];
+    this.transactions = [];
+    this.notifications = [];
+
+    this.notify();
+  }
+
   clearSampleData(): void {
     this.sales = [];
     this.saleItems = [];
@@ -520,31 +714,7 @@ export class MarketMateDataStore {
   }
 
   reloadSampleData(): void {
-    this.products = [...INITIAL_PRODUCTS];
-    this.sales = [...INITIAL_SALES];
-    this.saleItems = [...INITIAL_SALE_ITEMS];
-    this.expenses = [...INITIAL_EXPENSES];
-    this.customers = [...INITIAL_CUSTOMERS];
-    this.customerCredit = [...INITIAL_CUSTOMER_CREDIT];
-    this.creditPayments = [...INITIAL_CREDIT_PAYMENTS];
-    this.suppliers = [...INITIAL_SUPPLIERS];
-    this.transactions = [...INITIAL_TRANSACTIONS];
-    this.notifications = [...INITIAL_NOTIFICATIONS];
-    this.subscription = { ...INITIAL_SUBSCRIPTION };
-
-    setLocalData(STORAGE_KEYS.PRODUCTS, this.products);
-    setLocalData(STORAGE_KEYS.SALES, this.sales);
-    setLocalData(STORAGE_KEYS.SALE_ITEMS, this.saleItems);
-    setLocalData(STORAGE_KEYS.EXPENSES, this.expenses);
-    setLocalData(STORAGE_KEYS.CUSTOMERS, this.customers);
-    setLocalData(STORAGE_KEYS.CREDIT, this.customerCredit);
-    setLocalData(STORAGE_KEYS.CREDIT_PAYMENTS, this.creditPayments);
-    setLocalData(STORAGE_KEYS.SUPPLIERS, this.suppliers);
-    setLocalData(STORAGE_KEYS.TRANSACTIONS, this.transactions);
-    setLocalData(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
-    setLocalData(STORAGE_KEYS.SUBSCRIPTION, this.subscription);
-
-    this.notify();
+    this.loadDemoStore();
   }
 
   // --- BATCH PRODUCT IMPORT ---

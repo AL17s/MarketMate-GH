@@ -383,80 +383,113 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
             })}
           </div>
 
-          {/* Touch-Friendly Product Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-            {filteredProducts.map((p) => {
-              const isLow = p.stockQuantity <= p.lowStockThreshold;
-              const isOut = p.stockQuantity <= 0;
-
-              return (
+          {/* Touch-Friendly Product Grid or Friendly Empty State */}
+          {products.length === 0 ? (
+            <div className="text-center py-12 px-6 bg-white rounded-2xl border-2 border-dashed border-gray-200 my-2">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 text-[#005431] flex items-center justify-center mb-3">
+                <span className="material-symbols-outlined text-3xl">add_shopping_cart</span>
+              </div>
+              <span className="px-3 py-0.5 rounded-full bg-emerald-100 text-[#005431] text-[10px] font-mono-num font-bold uppercase tracking-wider">
+                Catalog Ready
+              </span>
+              <h3 className="text-base font-bold text-gray-900 mt-2 mb-1">
+                No products yet — tap + Add Product to start
+              </h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
+                Your catalog is clean. You can ring up sales with custom items right now, or add stock to your inventory.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
-                  key={p.id}
                   type="button"
-                  onClick={() => addToCart(p)}
-                  className="group relative flex flex-col text-left p-2.5 bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md hover:border-emerald-200 active:scale-[0.97] transition-all overflow-hidden"
+                  onClick={() => setShowCustomModal(true)}
+                  className="px-4 py-2 rounded-xl bg-[#005431] hover:bg-[#0d6e43] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs"
                 >
-                  {/* Image or Category placeholder */}
-                  <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#f0f3ff] mb-2 flex items-center justify-center">
-                    {p.imageUrl ? (
-                      <img
-                        src={p.imageUrl}
-                        alt={p.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-emerald-100/60 flex items-center justify-center text-[#005431]">
-                        <span className="material-symbols-outlined text-3xl">inventory_2</span>
-                      </div>
-                    )}
-
-                    {/* Stock badge */}
-                    <div
-                      className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-mono-num font-bold shadow-xs ${
-                        isOut
-                          ? 'bg-red-100 text-red-800'
-                          : isLow
-                          ? 'bg-red-100 text-red-800 flex items-center gap-1'
-                          : 'bg-white/90 backdrop-blur-xs text-[#005431]'
-                      }`}
-                    >
-                      {isOut ? (
-                        'Out of Stock'
-                      ) : isLow ? (
-                        <>
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
-                          Stock: {p.stockQuantity} Low
-                        </>
-                      ) : (
-                        `Stock: ${p.stockQuantity}`
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col flex-1 justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono-num text-gray-400 uppercase tracking-wider">
-                        {p.category}
-                      </span>
-                      <h4 className="text-xs font-bold text-gray-900 line-clamp-1 group-hover:text-[#005431] transition-colors">
-                        {p.name}
-                      </h4>
-                      <p className="text-[11px] text-gray-500">{p.unit}</p>
-                    </div>
-
-                    <div className="mt-2 flex items-baseline justify-between pt-1">
-                      <span className="text-sm font-mono-num text-[#005431] font-bold">
-                        GH₵ {p.sellingPrice.toFixed(2)}
-                      </span>
-                      <span className="w-7 h-7 rounded-full bg-emerald-100 text-[#005431] flex items-center justify-center group-hover:bg-[#005431] group-hover:text-white transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">add</span>
-                      </span>
-                    </div>
-                  </div>
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                  <span>+ Ring Up Custom Item</span>
                 </button>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-10 px-4 bg-white rounded-xl border border-gray-100 text-gray-400">
+              <span className="material-symbols-outlined text-3xl mb-1 text-gray-300">search_off</span>
+              <p className="text-xs font-bold text-gray-600">No items match your search</p>
+              <p className="text-[11px] text-gray-400">Try selecting "All Items" or searching for a different keyword.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+              {filteredProducts.map((p) => {
+                const isLow = p.stockQuantity <= p.lowStockThreshold;
+                const isOut = p.stockQuantity <= 0;
+
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addToCart(p)}
+                    className="group relative flex flex-col text-left p-2.5 bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md hover:border-emerald-200 active:scale-[0.97] transition-all overflow-hidden"
+                  >
+                    {/* Image or Category placeholder */}
+                    <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#f0f3ff] mb-2 flex items-center justify-center">
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-emerald-100/60 flex items-center justify-center text-[#005431]">
+                          <span className="material-symbols-outlined text-3xl">inventory_2</span>
+                        </div>
+                      )}
+
+                      {/* Stock badge */}
+                      <div
+                        className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-mono-num font-bold shadow-xs ${
+                          isOut
+                            ? 'bg-red-100 text-red-800'
+                            : isLow
+                            ? 'bg-red-100 text-red-800 flex items-center gap-1'
+                            : 'bg-white/90 backdrop-blur-xs text-[#005431]'
+                        }`}
+                      >
+                        {isOut ? (
+                          'Out of Stock'
+                        ) : isLow ? (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                            Stock: {p.stockQuantity} Low
+                          </>
+                        ) : (
+                          `Stock: ${p.stockQuantity}`
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col flex-1 justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono-num text-gray-400 uppercase tracking-wider">
+                          {p.category}
+                        </span>
+                        <h4 className="text-xs font-bold text-gray-900 line-clamp-1 group-hover:text-[#005431] transition-colors">
+                          {p.name}
+                        </h4>
+                        <p className="text-[11px] text-gray-500">{p.unit}</p>
+                      </div>
+
+                      <div className="mt-2 flex items-baseline justify-between pt-1">
+                        <span className="text-sm font-mono-num text-[#005431] font-bold">
+                          GH₵ {p.sellingPrice.toFixed(2)}
+                        </span>
+                        <span className="w-7 h-7 rounded-full bg-emerald-100 text-[#005431] flex items-center justify-center group-hover:bg-[#005431] group-hover:text-white transition-colors">
+                          <span className="material-symbols-outlined text-[18px]">add</span>
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Rapid Keypad Quick Shortcuts */}
           <div className="p-3 bg-white rounded-xl shadow-xs border border-gray-100 flex flex-wrap items-center justify-between gap-3">

@@ -208,12 +208,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl md:text-2xl font-bold font-mono-num text-red-600 tracking-tight">
               {metrics.lowStockItemsCount} Items
             </div>
-            <div className="mt-1 flex items-center gap-1 text-[11px] font-mono-num text-red-600 font-semibold">
-              <span className="material-symbols-outlined text-[15px]">notification_important</span>
-              <span>Immediate restock alert</span>
+            <div className="mt-1 flex items-center gap-1 text-[11px] font-mono-num font-semibold text-gray-500">
+              {metrics.lowStockItemsCount > 0 ? (
+                <>
+                  <span className="material-symbols-outlined text-[15px] text-red-600">notification_important</span>
+                  <span className="text-red-600">Immediate restock alert</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[15px] text-[#005431]">check_circle</span>
+                  <span className="text-[#005431]">Stock levels healthy</span>
+                </>
+              )}
             </div>
           </div>
-          <div className="pt-1 text-gray-500 text-xs truncate">Includes Ideal Milk &amp; Frytol</div>
+          <div className="pt-1 text-gray-500 text-xs truncate">
+            {metrics.totalCatalogCount === 0
+              ? 'Catalog is empty'
+              : metrics.lowStockItemsCount > 0
+              ? `${metrics.lowStockItemsCount} items need replenishment`
+              : 'All catalog items well-stocked'}
+          </div>
         </div>
       </div>
 
@@ -375,32 +390,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="material-symbols-outlined text-[#835500]">local_fire_department</span>
           </div>
 
-          <div className="flex flex-col gap-4">
-            {metrics.bestSellingProducts.slice(0, 4).map((p, idx) => {
-              const maxSold = metrics.bestSellingProducts[0]?.quantitySold || 50;
-              const percent = Math.min(100, Math.round((p.quantitySold / maxSold) * 100));
-              const barColors = ['bg-[#005431]', 'bg-[#0d6e43]', 'bg-[#feae2c]', 'bg-gray-400'];
+          {metrics.bestSellingProducts.length === 0 ? (
+            <div className="py-8 text-center text-gray-400">
+              <span className="material-symbols-outlined text-3xl mb-1 text-gray-300">receipt_long</span>
+              <p className="text-xs font-semibold text-gray-600">No sales recorded yet</p>
+              <p className="text-[11px] text-gray-400">Top selling items will appear here once sales are rung up.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {metrics.bestSellingProducts.slice(0, 4).map((p, idx) => {
+                const maxSold = metrics.bestSellingProducts[0]?.quantitySold || 50;
+                const percent = Math.min(100, Math.round((p.quantitySold / maxSold) * 100));
+                const barColors = ['bg-[#005431]', 'bg-[#0d6e43]', 'bg-[#feae2c]', 'bg-gray-400'];
 
-              return (
-                <div key={p.productId} className="space-y-1">
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-gray-900 truncate">
-                      {idx + 1}. {p.productName}
-                    </span>
-                    <span className="font-mono-num text-[#005431] shrink-0">
-                      {p.quantitySold} sold • GH₵ {p.revenueGHS.toFixed(0)}
-                    </span>
+                return (
+                  <div key={p.productId} className="space-y-1">
+                    <div className="flex justify-between items-center text-xs font-semibold">
+                      <span className="text-gray-900 truncate">
+                        {idx + 1}. {p.productName}
+                      </span>
+                      <span className="font-mono-num text-[#005431] shrink-0">
+                        {p.quantitySold} sold • GH₵ {p.revenueGHS.toFixed(0)}
+                      </span>
+                    </div>
+                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${barColors[idx % barColors.length]}`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${barColors[idx % barColors.length]}`}
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="mt-5 pt-3 border-t border-gray-100 flex justify-between items-center text-xs font-mono-num">
             <span className="text-gray-500">{metrics.totalCatalogCount} catalog SKUs active</span>
@@ -479,7 +502,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredSales.map((sale) => {
+              {filteredSales.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-gray-400">
+                    <span className="material-symbols-outlined text-3xl mb-1 text-gray-300">point_of_sale</span>
+                    <p className="text-xs font-semibold text-gray-600">No transactions recorded yet</p>
+                    <p className="text-[11px] text-gray-400">Completed sales and credit records will appear here in real-time.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredSales.map((sale) => {
                 const initials = (sale.customerName || 'WA')
                   .split(' ')
                   .map((w) => w[0])
@@ -584,7 +616,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

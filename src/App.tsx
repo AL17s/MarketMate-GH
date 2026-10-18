@@ -15,12 +15,14 @@ import { ReportsView } from './components/reports/ReportsView';
 import { MateAiAdvisorView } from './components/ai/MateAiAdvisorView';
 import { SettingsView } from './components/settings/SettingsView';
 import { SubscriptionView } from './components/subscription/SubscriptionView';
+import { SetupWizardModal } from './components/onboarding/SetupWizardModal';
 
 export default function App() {
   // Navigation
   const [currentPath, setCurrentPath] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const [showSetupWizard, setShowSetupWizard] = useState<boolean>(() => !store.hasConfiguredBusiness());
 
   // Reactive store state
   const [, setTick] = useState(0);
@@ -228,6 +230,17 @@ export default function App() {
               onUpdateBusiness={async (updates) => {
                 return await store.updateBusiness(updates);
               }}
+              onResetStore={() => {
+                store.resetStoreAndStartClean();
+                setShowSetupWizard(true);
+                setCurrentPath('dashboard');
+              }}
+              onClearSampleData={() => {
+                store.clearSampleData();
+              }}
+              onReloadDemoData={() => {
+                store.reloadSampleData();
+              }}
             />
           )}
 
@@ -249,6 +262,22 @@ export default function App() {
           setCurrentPath(path);
           setIsNotificationsOpen(false);
         }}
+      />
+
+      {/* Welcome / Onboarding Setup Wizard Modal */}
+      <SetupWizardModal
+        isOpen={showSetupWizard}
+        initialBusiness={business}
+        onCompleteCleanShop={async (params) => {
+          await store.initializeCleanStore(params);
+          setShowSetupWizard(false);
+        }}
+        onExploreDemo={() => {
+          store.loadDemoStore();
+          setShowSetupWizard(false);
+        }}
+        canDismiss={store.hasConfiguredBusiness()}
+        onClose={() => setShowSetupWizard(false)}
       />
 
       {/* Mobile Fixed Bottom Action Bar (Matching screenshot) */}
