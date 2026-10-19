@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Business, Notification } from '../../types/models';
 
 interface HeaderProps {
@@ -19,6 +19,57 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
+  const [showInstallModal, setShowInstallModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Check if running in standalone mode (already installed)
+    const checkStandalone = () => {
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+      setIsInstalled(isStandalone);
+    };
+
+    checkStandalone();
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          setIsInstalled(true);
+        }
+        setDeferredPrompt(null);
+      } catch (err) {
+        console.warn('Native install prompt failed, showing guide modal', err);
+        setShowInstallModal(true);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md z-40 border-b border-gray-100 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
@@ -103,8 +154,26 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Status, Currency, Notifications & Avatar */}
+        {/* Right Status, Currency, Install App, Notifications & Avatar */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* PWA Install App Button */}
+          {!isInstalled ? (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#005431] hover:bg-[#023b22] text-white text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+              title="Install MarketMate GH for fast offline access on phone or desktop"
+            >
+              <span className="material-symbols-outlined text-[17px]">install_mobile</span>
+              <span className="hidden sm:inline">Install App</span>
+            </button>
+          ) : (
+            <div className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-[#005431] text-[11px] font-mono-num font-bold border border-emerald-200/60">
+              <span className="material-symbols-outlined text-[14px]">verified</span>
+              <span>Installed</span>
+            </div>
+          )}
+
           {/* Real-time Cloud Sync Pill */}
           <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-[#005431] text-[11px] font-mono-num font-bold border border-emerald-200/60 shadow-xs">
             <span className="material-symbols-outlined text-[15px] text-[#005431]">cloud_done</span>
@@ -177,11 +246,95 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
                   <span>Manage Subscription</span>
                 </button>
+                {!isInstalled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      handleInstallClick();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-emerald-800 hover:bg-emerald-50 rounded-lg flex items-center gap-2 font-semibold"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-[#005431]">install_mobile</span>
+                    <span>Install PWA App</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* PWA Install Guidance Modal (fallback when native prompt is pending or iOS Safari) */}
+      {showInstallModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#005431] flex items-center justify-center text-white shadow-md">
+                  <span className="material-symbols-outlined text-2xl">install_mobile</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Install MarketMate GH</h3>
+                  <p className="text-xs text-gray-500">Fast, offline-ready SME Point of Sale</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInstallModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-gray-600 bg-[#f0f3ff] p-4 rounded-xl border border-blue-50">
+              <div className="flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-emerald-700 text-[18px] shrink-0 mt-0.5">offline_bolt</span>
+                <div>
+                  <strong className="text-gray-900 block">Instant Offline Access</strong>
+                  Ring up sales and record expenses in Makola or Kejetia even during network outages.
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-emerald-700 text-[18px] shrink-0 mt-0.5">home_app_logo</span>
+                <div>
+                  <strong className="text-gray-900 block">No App Store Download Required</strong>
+                  Runs natively in standalone fullscreen like an Android or iOS application.
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider font-mono-num">
+                Quick Setup Steps:
+              </h4>
+              <div className="space-y-2 text-xs text-gray-700">
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005431] font-bold text-[11px] flex items-center justify-center shrink-0">1</span>
+                  <span><strong>Chrome / Android:</strong> Tap the 3 dots (⋮) in the top-right &rarr; <em>Install App</em> or <em>Add to Home Screen</em>.</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005431] font-bold text-[11px] flex items-center justify-center shrink-0">2</span>
+                  <span><strong>iPhone / iPad (Safari):</strong> Tap the Share button (square with arrow) &rarr; scroll down and tap <em>Add to Home Screen</em>.</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005431] font-bold text-[11px] flex items-center justify-center shrink-0">3</span>
+                  <span><strong>Desktop (Chrome / Edge):</strong> Click the install icon <span className="font-mono bg-gray-200 px-1 rounded">⊕</span> in the address bar.</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowInstallModal(false)}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#005431] text-white font-bold text-xs hover:bg-[#0d6e43] transition-colors cursor-pointer"
+            >
+              Got It, Medaase!
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

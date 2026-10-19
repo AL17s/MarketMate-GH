@@ -237,15 +237,42 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               </div>
             </div>
 
-            {/* Category Quick-Picker Grid */}
-            <div className="flex flex-col gap-2">
+            {/* Category Dropdown & Quick-Picker Grid */}
+            <div className="flex flex-col gap-2.5">
               <div className="flex justify-between items-center">
-                <label className="text-[11px] font-mono-num uppercase tracking-wider text-gray-500 font-bold">
-                  Category Distribution
+                <label htmlFor="expense-category-select" className="text-[11px] font-mono-num uppercase tracking-wider text-gray-500 font-bold flex items-center gap-1">
+                  <span>Category Outflow</span>
+                  <span className="text-gray-400 font-normal">(Dropdown &amp; Quick Select)</span>
                 </label>
-                <span className="text-xs font-semibold text-[#005431]">{selectedCategory}</span>
+                <span className="text-xs font-semibold text-[#005431] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                  {selectedCategory}
+                </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+              {/* Categorization Dropdown */}
+              <div className="relative">
+                <select
+                  id="expense-category-select"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as ExpenseCategory)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#f0f3ff] text-gray-900 font-semibold text-xs border border-blue-100 focus:outline-none focus:ring-2 focus:ring-[#005431] appearance-none cursor-pointer pr-10 shadow-xs"
+                >
+                  <option value="Stock Purchase">Stock Purchase (Wholesale goods, inventory, restock)</option>
+                  <option value="Shop Rent">Rent (Shop / Stall Rental, space lease)</option>
+                  <option value="Trotro / Fuel">Transport (Trotro fare, loading fee, fuel, logistics)</option>
+                  <option value="ECG / Power">Utility (ECG electricity tokens, water bill, waste)</option>
+                  <option value="Wages & Chow">Wages &amp; Chow (Shop assistant daily pay &amp; lunch allowance)</option>
+                  <option value="Packaging / Bags">Packaging / Bags (Polythene, cartons, sealing)</option>
+                  <option value="Data & Airtime">Data &amp; Airtime (Internet bundles, client calls)</option>
+                  <option value="Assembly Toll">Assembly Toll (District / AMA municipal ticket)</option>
+                  <option value="Other Expense">Other Expense (Repairs, maintenance, miscellaneous)</option>
+                </select>
+                <span className="material-symbols-outlined absolute right-3 top-2.5 text-gray-500 pointer-events-none text-[20px]">
+                  arrow_drop_down
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                 {categoryOptions.map((cat) => {
                   const isActive = selectedCategory === cat.name;
                   return (
